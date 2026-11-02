@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🎾 Tennis Analysis Agent — 全管线架构</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --card: #161b22;
+    --border: #30363d;
+    --text: #c9d1d9;
+    --muted: #8b949e;
+    --accent: #58a6ff;
+    --green: #3fb950;
+    --orange: #d2991d;
+    --purple: #a371f7;
+    --red: #f85149;
+    --pink: #db61a2;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    padding: 24px;
+  }
+  .container { max-width: 1100px; margin: 0 auto; }
+  h1 {
+    text-align: center;
+    font-size: 2.2em;
+    margin-bottom: 8px;
+    background: linear-gradient(135deg, #58a6ff, #a371f7);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .subtitle { text-align: center; color: var(--muted); margin-bottom: 40px; font-size: 1.05em; }
+
+  /* Pipeline Row */
+  .pipeline-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 0;
+    margin-bottom: 48px;
+    overflow-x: auto;
+    padding-bottom: 12px;
+  }
+  .stage {
+    flex: 1;
+    min-width: 150px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+    text-align: center;
+    position: relative;
+  }
+  .stage .icon { font-size: 1.8em; margin-bottom: 6px; }
+  .stage .title { font-weight: 700; font-size: 0.95em; margin-bottom: 4px; }
+  .stage .tech { font-size: 0.78em; color: var(--muted); }
+  .arrow {
+    display: flex; align-items: center; justify-content: center;
+    min-width: 32px; font-size: 1.2em; color: var(--muted); flex-shrink: 0;
+    padding-top: 28px;
+  }
+
+  /* Section */
+  .section {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 28px;
+    margin-bottom: 32px;
+  }
+  .section h2 {
+    font-size: 1.35em;
+    margin-bottom: 20px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .section h3 {
+    font-size: 1.05em;
+    margin: 20px 0 10px;
+    color: var(--accent);
+  }
+
+  /* Two-column */
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  @media (max-width: 720px) { .two-col { grid-template-columns: 1fr; } }
+
+  /* Tags */
+  .tag {
+    display: inline-block;
+    padding: 2px 10px; border-radius: 20px;
+    font-size: 0.78em; font-weight: 600;
+    margin: 2px;
+  }
+  .tag-model { background: #1a3a5c; color: var(--accent); }
+  .tag-lib { background: #1a3a1a; color: var(--green); }
+  .tag-data { background: #3a2a0a; color: var(--orange); }
+  .tag-output { background: #2a1a3a; color: var(--purple); }
+  .tag-user { background: #3a1a2a; color: var(--pink); }
+
+  /* Data flow diagram */
+  .data-flow {
+    display: flex; flex-direction: column; gap: 8px;
+    margin: 16px 0;
+  }
+  .data-flow .node {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 16px; border-radius: 8px;
+    border: 1px dashed var(--border);
+    font-size: 0.9em;
+  }
+  .data-flow .node .dot {
+    width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+  }
+
+  /* Code */
+  pre {
+    background: #0d1117; border: 1px solid var(--border); border-radius: 8px;
+    padding: 16px; overflow-x: auto; font-size: 0.82em; line-height: 1.5;
+    margin: 12px 0;
+  }
+
+  /* Table */
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 0.9em; }
+  th, td { padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 600; font-size: 0.82em; text-transform: uppercase; }
+  td .highlight { color: var(--accent); font-weight: 600; }
+
+  /* Steps */
+  .steps { counter-reset: step; list-style: none; }
+  .steps li {
+    counter-increment: step;
+    padding: 10px 0 10px 40px;
+    position: relative;
+    border-left: 2px solid var(--border);
+    margin-left: 16px;
+  }
+  .steps li::before {
+    content: counter(step);
+    position: absolute; left: -15px; top: 8px;
+    width: 28px; height: 28px;
+    background: var(--accent); color: #fff;
+    border-radius: 50%; text-align: center; line-height: 28px;
+    font-size: 0.82em; font-weight: 700;
+  }
+
+  hr { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
+
+  .badge-row { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+  .note {
+    background: #1a2a3a; border-left: 3px solid var(--accent);
+    padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 16px 0; font-size: 0.9em;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>🎾 Tennis Analysis Agent</h1>
+<p class="subtitle">个人网球动作分析系统 — 完整管线架构文档 &nbsp;|&nbsp; 2024-07</p>
+
+<!-- ====== OVERVIEW PIPELINE ====== -->
+<div class="section">
+  <h2>📐 全景管线总览</h2>
+  <div class="pipeline-row">
+    <div class="stage">
+      <div class="icon">🎥</div>
+      <div class="title">视频输入</div>
+      <div class="tech">你的打球视频</div>
+    </div>
+    <div class="arrow">→</div>
+    <div class="stage">
+      <div class="icon">🧬</div>
+      <div class="title">姿态提取</div>
+      <div class="tech">MediaPipe Pose</div>
+    </div>
+    <div class="arrow">→</div>
+    <div class="stage">
+      <div class="icon">🔍</div>
+      <div class="title">动作识别</div>
+      <div class="tech">击球分类 + 阶段切分</div>
+    </div>
+    <div class="arrow">→</div>
+    <div class="stage">
+      <div class="icon">📐</div>
+      <div class="title">生物力学分析</div>
+      <div class="tech">关节角度 · 轨迹 · 偏差</div>
+    </div>
+    <div class="arrow">→</div>
+    <div class="stage">
+      <div class="icon">📚</div>
+      <div class="title">教练知识检索</div>
+      <div class="tech">RAG 向量搜索</div>
+    </div>
+    <div class="arrow">→</div>
+    <div class="stage" style="border-color: var(--purple);">
+      <div class="icon">🧠</div>
+      <div class="title">LLM 反馈生成</div>
+      <div class="tech">Claude API</div>
+    </div>
+    <div class="arrow">→</div>
+    <div class="stage" style="border-color: var(--green);">
+      <div class="icon">📊</div>
+      <div class="title">报告输出</div>
+      <div class="tech">文本 + 可视化标注</div>
+    </div>
+  </div>
+</div>
+
+<!-- ====== WHAT YOU NEED ====== -->
+<div class="section">
+  <h2>📦 你需要提供的数据</h2>
+
+  <div class="two-col">
+    <div>
+      <h3>✅ 必须的</h3>
+      <table>
+        <tr><th>数据</th><th>格式</th><th>说明</th></tr>
+        <tr><td>🎥 你的打球视频</td><td>MP4/MOV</td><td>手机拍摄，固定机位，侧面或斜后45°，30fps+</td></tr>
+      </table>
+      <div class="note">
+        <strong>拍摄建议：</strong>三脚架固定、光线充足、穿贴身衣服（利于姿态识别）、每次录 5-10 个击球即可分析。
+      </div>
+    </div>
+    <div>
+      <h3>📝 建议提供</h3>
+      <table>
+        <tr><th>数据</th><th>用途</th></tr>
+        <tr><td>👤 球员画像</td><td>水平、年龄、惯用手、身高体重、伤病</td></tr>
+        <tr><td>🎯 改进目标</td><td>"我发球抛球不稳" → 针对性分析发球</td></tr>
+        <tr><td>📅 多次录制</td><td>同动作多天拍摄 → 追踪进步趋势</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <h3>🎓 教练视频（你的核心数据资产）</h3>
+  <p>你拥有的学院派教练视频是让 Agent <strong>从"通用分析"升级到"专业教练水平"</strong>的关键。</p>
+  <table>
+    <tr><th>教练视频内容</th><th>可提取什么</th><th>融入方式</th></tr>
+    <tr>
+      <td>🎙️ 口头讲解</td>
+      <td>技术要点、常见错误、纠正口诀</td>
+      <td>Whisper 转录 → Claude 结构化 → 向量知识库</td>
+    </tr>
+    <tr>
+      <td>🕺 标准示范</td>
+      <td>理想姿态序列（关键点坐标）</td>
+      <td>MediaPipe 提取 → 作为对比基准</td>
+    </tr>
+    <tr>
+      <td>❌→✅ 错误 vs 正确对比</td>
+      <td>典型错误的姿态偏差模式</td>
+      <td>姿态差异向量 → 自动匹配你的错误类型</td>
+    </tr>
+    <tr>
+      <td>🏋️ 训练方法演示</td>
+      <td>针对性练习步骤</td>
+      <td>存入知识库 → 反馈时推荐训练方法</td>
+    </tr>
+  </table>
+</div>
+
+<!-- ====== PIPELINE A: YOUR VIDEO ====== -->
+<div class="section">
+  <h2>🔬 管线 A：你的视频 → 动作分析</h2>
+
+  <ol class="steps">
+    <li>
+      <strong>视频帧提取</strong>
+      <div class="badge-row">
+        <span class="tag tag-lib">OpenCV</span>
+        <span class="tag tag-data">输入：.mp4</span>
+        <span class="tag tag-output">输出：帧序列 (numpy)</span>
+      </div>
+      <p style="margin-top:6px;color:var(--muted)">按 15-30 FPS 抽帧，去模糊帧自动跳过。</p>
+    </li>
+    <li>
+      <strong>人体姿态估计</strong>
+      <div class="badge-row">
+        <span class="tag tag-model">MediaPipe Pose</span>
+        <span class="tag tag-output">输出：33个关键点 × 3D (x,y,z,visibility)</span>
+      </div>
+      <p style="margin-top:6px;color:var(--muted)">肩、肘、腕、髋、膝、踝等 33 个身体关键点，每帧一组。</p>
+    </li>
+    <li>
+      <strong>球 & 球拍追踪</strong>
+      <div class="badge-row">
+        <span class="tag tag-model">TrackNet / 色块追踪</span>
+        <span class="tag tag-output">输出：球轨迹 (x,y,t) + 拍头轨迹</span>
+      </div>
+    </li>
+    <li>
+      <strong>击球事件检测</strong>
+      <div class="badge-row">
+        <span class="tag tag-data">基于手腕/拍头速度突变</span>
+        <span class="tag tag-output">输出：每次击球的时间戳</span>
+      </div>
+    </li>
+    <li>
+      <strong>击球类型分类</strong>
+      <div class="badge-row">
+        <span class="tag tag-data">规则 + 姿态特征</span>
+        <span class="tag tag-output">输出：正手 / 反手 / 发球 / 截击 / 高压</span>
+      </div>
+    </li>
+    <li>
+      <strong>动作阶段切分</strong>
+      <p style="color:var(--muted)">每个击球拆为 5 个阶段：<br>
+      <code>准备姿势</code> → <code>引拍</code> → <code>前挥</code> → <code>触球</code> → <code>随挥</code></p>
+    </li>
+    <li>
+      <strong>生物力学指标计算</strong>
+      <table>
+        <tr><th>动作</th><th>关键指标</th></tr>
+        <tr><td>🏐 发球</td><td>抛球高度偏差 · 膝曲角 · 肩外旋角 · 击球点高度 · 躯干后仰角</td></tr>
+        <tr><td>🎾 正手</td><td>身体转体幅度 · 肘部与身体距离 · 击球点前后位置 · 随挥高度 · 重心转移</td></tr>
+        <tr><td>🔙 反手</td><td>肩部转动角 · 非持拍手引导 · 击球点位置 · 重心转移</td></tr>
+        <tr><td>🦶 步法</td><td>分腿垫步时机 · 回位速度 · 移动中击球稳定性</td></tr>
+      </table>
+    </li>
+  </ol>
+</div>
+
+<!-- ====== PIPELINE B: COACH KNOWLEDGE ====== -->
+<div class="section">
+  <h2>🎓 管线 B：教练视频 → 结构化知识库</h2>
+
+  <ol class="steps">
+    <li>
+      <strong>音频提取</strong>
+      <div class="badge-row">
+        <span class="tag tag-lib">ffmpeg</span>
+        <span class="tag tag-data">输入：教练 .mp4</span>
+        <span class="tag tag-output">输出：.wav 音频</span>
+      </div>
+    </li>
+    <li>
+      <strong>语音转文字</strong>
+      <div class="badge-row">
+        <span class="tag tag-model">OpenAI Whisper</span>
+        <span class="tag tag-output">输出：完整逐字稿</span>
+      </div>
+      <p style="margin-top:6px;color:var(--muted)">本地运行，免费。支持中英文。large-v3 模型精度最高。</p>
+    </li>
+    <li>
+      <strong>知识点结构化提取</strong>
+      <div class="badge-row">
+        <span class="tag tag-model">Claude API</span>
+        <span class="tag tag-output">输出：结构化知识卡片 JSON</span>
+      </div>
+    </li>
+  </ol>
+
+  <h3>知识卡片 Schema</h3>
+  <pre>{
+  "coach": "张教练",
+  "stroke": "正手",
+  "phase": "引拍阶段",
+  "aspect": "手臂位置与发力空间",
+  "common_error": "引拍时肘部太靠近身体，限制发力空间",
+  "why_it_matters": "肘部贴近身体 → 只能用前臂发力 → 缺少身体转动带来的力量",
+  "ideal_form": "引拍时肘部离身体至少一拳距离，拍头高于手腕",
+  "correction": "想象腋下夹一个网球，保持空间做空挥",
+  "drill": "腋下夹球空挥 ×20次 → 无球挥拍 ×20次 → 有球击打",
+  "key_quote": "引拍要有空间，没有空间就没有力量",
+  "tags": ["正手", "引拍", "发力", "初学者"]
+}</pre>
+
+  <div class="two-col">
+    <div>
+      <h3>教练示范姿态提取</h3>
+      <p style="color:var(--muted)">教练做标准示范时，同样跑 MediaPipe 提取关键点序列，作为"理想基准"。</p>
+      <div class="data-flow">
+        <div class="node"><span class="dot" style="background:var(--green)"></span> 教练示范视频片段 → MediaPipe → 标准姿态关键点序列</div>
+        <div class="node"><span class="dot" style="background:var(--purple)"></span> 存入知识库，标注"这是 XXX 教练的标准正手引拍"</div>
+        <div class="node"><span class="dot" style="background:var(--accent)"></span> 分析你的视频时，做姿态序列对齐（DTW），计算逐帧偏差</div>
+      </div>
+    </div>
+    <div>
+      <h3>向量知识库构建</h3>
+      <div class="data-flow">
+        <div class="node"><span class="dot" style="background:var(--orange)"></span> 所有知识卡片 → embedding（文本向量化）</div>
+        <div class="node"><span class="dot" style="background:var(--orange)"></span> 存入向量数据库（ChromaDB / LanceDB）</div>
+        <div class="node"><span class="dot" style="background:var(--accent)"></span> 分析时按语义检索相关教练建议</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ====== PIPELINE C: FUSION ====== -->
+<div class="section">
+  <h2>🔗 管线 C：两路融合 → LLM 反馈生成</h2>
+
+  <h3>Prompt 结构设计</h3>
+  <pre>## 角色
+你是一位资深网球教练，请分析以下业余球员的动作数据，给出专业改进建议。
+
+## 球员信息
+- 水平：中级（3.0 UTR）
+- 惯用手：右手
+- 本次重点改进：发球抛球一致性
+
+## 量化分析结果
+- 动作类型：发球
+- 抛球高度：2.35m（理想范围 2.60-3.00m）⚠️ 偏低
+- 膝曲角度：62°（理想范围 70-90°）⚠️ 不足
+- 击球点高度：2.41m（应在最高点）⚠️ 偏低
+- 肩外旋幅度：良好 ✓
+
+## 相关教练知识（来自你的教练知识库）
+1. 张教练："抛球要有停顿感，球到最高点再出手"
+2. 李教练："膝盖弯曲不够 → 少了腿部的力量传导"
+3. 王教练建议的训练：抛球练习 ×50次，不击球只看落点
+
+## 教练示范姿态
+（若检索到教练发球示范的关键帧/姿态数据，附于此）
+
+## 任务
+1. 指出 2-3 个最需要改进的点，按优先级排序
+2. 对每个问题，引用教练的建议并解释原因
+3. 给出本周可以做的 2 个针对性训练
+4. 语气积极、鼓励，用中文</pre>
+
+  <h3>反馈输出示例</h3>
+  <div style="background:#0d1117;border:1px solid var(--border);border-radius:8px;padding:20px;margin-top:12px;font-size:0.9em;">
+    <p style="color:var(--accent);font-weight:700;margin-bottom:10px;">🎾 发球分析报告</p>
+
+    <p><strong>🔴 优先级 1：抛球高度不足（-25cm）</strong></p>
+    <p>你的抛球平均 2.35m，低于理想的 2.60-3.00m。如张教练所说：「抛球要有停顿感，球到最高点再出手」。抛球偏低会导致你仓促击球，被迫降低击球点，损失力量和稳定性。</p>
+    <p><strong>本周训练：</strong>每天做 50 次抛球练习——只抛不击，要求球每次落在身体前方同一位置，用胶带在地面标记落点范围。</p>
+
+    <p style="margin-top:14px;"><strong>🟡 优先级 2：膝关节发力参与不足</strong></p>
+    <p>膝曲仅 62°，李教练强调：「没有腿就没有发球」。你的下肢力量没有充分传递到击球。建议做慢动作发球练习，专注于"蹬地→转髋→挥臂"的动力链顺序。</p>
+
+    <p style="margin-top:14px;color:var(--green);"><strong>✅ 做得好的：</strong>肩外旋幅度在合理范围，说明你的肩部柔韧性不错，保持！</p>
+  </div>
+</div>
+
+<!-- ====== TECH STACK ====== -->
+<div class="section">
+  <h2>🛠 技术栈总览</h2>
+
+  <table>
+    <tr><th>层</th><th>技术</th><th>用途</th></tr>
+    <tr><td>🖥️ 语言</td><td class="highlight">Python 3.11+</td><td>全栈主语言</td></tr>
+    <tr><td>🎥 视频处理</td><td class="highlight">OpenCV</td><td>帧提取、视频编解码、可视化标注</td></tr>
+    <tr><td>🧬 姿态估计</td><td class="highlight">MediaPipe Pose</td><td>33点人体关键点，CPU 实时，无需 GPU</td></tr>
+    <tr><td>🏐 球追踪</td><td class="highlight">TrackNet v3</td><td>网球轨迹追踪（可选，简单场景可用色块法）</td></tr>
+    <tr><td>🎙️ 语音转录</td><td class="highlight">OpenAI Whisper</td><td>教练视频语音 → 文字，本地运行免费</td></tr>
+    <tr><td>🧠 LLM</td><td class="highlight">Claude API (Anthropic)</td><td>知识结构化 + 反馈生成</td></tr>
+    <tr><td>📚 向量库</td><td class="highlight">ChromaDB / LanceDB</td><td>教练知识检索 (RAG)</td></tr>
+    <tr><td>🖼️ UI</td><td class="highlight">Streamlit</td><td>上传界面 + 分析报告展示</td></tr>
+    <tr><td>📐 数据计算</td><td class="highlight">NumPy / SciPy</td><td>角度计算、DTW 姿态对齐、统计分析</td></tr>
+  </table>
+</div>
+
+<!-- ====== PROJECT STRUCTURE ====== -->
+<div class="section">
+  <h2>📁 推荐项目结构</h2>
+  <pre>Tennis_Agent/
+├── app.py                    # Streamlit 主入口
+├── config.py                 # 配置（API key、路径等）
+├── requirements.txt
+│
+├── pipeline_a/               # 管线A：你的视频分析
+│   ├── video_loader.py       #   帧提取 + 预处理
+│   ├── pose_estimator.py     #   MediaPipe 姿态估计
+│   ├── ball_tracker.py       #   球 & 球拍追踪
+│   ├── stroke_detector.py    #   击球检测 + 类型分类
+│   ├── phase_splitter.py     #   动作阶段切分
+│   └── biomechanics.py       #   关节角度 & 偏差分析
+│
+├── pipeline_b/               # 管线B：教练知识库构建
+│   ├── audio_extract.py      #   视频 → 音频
+│   ├── transcribe.py         #   Whisper 语音转文字
+│   ├── knowledge_extract.py  #   Claude 结构化提取
+│   ├── pose_reference.py     #   教练示范姿态提取
+│   └── vector_store.py       #   向量库构建 & 检索
+│
+├── pipeline_c/               # 管线C：反馈融合
+│   ├── prompt_builder.py     #   组装 prompt（数据 + 知识）
+│   ├── llm_feedback.py       #   调用 Claude 生成反馈
+│   └── report.py             #   格式化输出报告
+│
+├── knowledge_db/             # 知识库存储
+│   └── chroma/               #   ChromaDB 持久化目录
+│
+├── coach_videos/             # 教练视频源文件（你的数据资产）
+├── user_videos/              # 用户上传的视频
+└── outputs/                  # 分析结果输出
+    ├── pose_data/            #   姿态关键点 JSON
+    └── reports/              #   反馈报告</pre>
+</div>
+
+<!-- ====== ROADMAP ====== -->
+<div class="section">
+  <h2>🗺️ 实施路线图</h2>
+
+  <table>
+    <tr><th>阶段</th><th>内容</th><th>产出</th><th>预计</th></tr>
+    <tr>
+      <td><span class="tag tag-data">Phase 1</span></td>
+      <td>核心管线跑通</td>
+      <td>视频 → MediaPipe 姿态提取 → 关键点可视化叠加</td>
+      <td>1-2 天</td>
+    </tr>
+    <tr>
+      <td><span class="tag tag-data">Phase 2</span></td>
+      <td>动作识别</td>
+      <td>击球检测 + 类型分类 + 阶段切分</td>
+      <td>2-3 天</td>
+    </tr>
+    <tr>
+      <td><span class="tag tag-data">Phase 3</span></td>
+      <td>生物力学分析</td>
+      <td>关节角度计算 + 与理想值偏差对比</td>
+      <td>3-4 天</td>
+    </tr>
+    <tr>
+      <td><span class="tag tag-model">Phase 4</span></td>
+      <td>教练知识库</td>
+      <td>Whisper 转录 + Claude 结构化 + ChromaDB 向量库</td>
+      <td>2-3 天</td>
+    </tr>
+    <tr>
+      <td><span class="tag tag-model">Phase 5</span></td>
+      <td>LLM 反馈引擎</td>
+      <td>Prompt 模板 + RAG 检索 + Claude 生成反馈</td>
+      <td>2-3 天</td>
+    </tr>
+    <tr>
+      <td><span class="tag tag-lib">Phase 6</span></td>
+      <td>UI + 完整流程</td>
+      <td>Streamlit 上传界面 + 报告页 + 标注视频回放</td>
+      <td>2-3 天</td>
+    </tr>
+  </table>
+</div>
+
+<!-- ====== KEY DESIGN DECISIONS ====== -->
+<div class="section">
+  <h2>💡 关键设计决策</h2>
+
+  <div class="two-col">
+    <div>
+      <h3>❌ 不做的</h3>
+      <ul style="color:var(--muted);padding-left:20px;line-height:2;">
+        <li>训练自己的姿态估计模型 → 用 MediaPipe 足够</li>
+        <li>收集海量标注数据 → 不需要</li>
+        <li>写死规则库 → 让 LLM 做推理</li>
+        <li>依赖 GPU → 全流程 CPU 可跑</li>
+        <li>职业球员视频对比 → 先用内置参考值</li>
+      </ul>
+    </div>
+    <div>
+      <h3>✅ 核心思路</h3>
+      <ul style="color:var(--green);padding-left:20px;line-height:2;">
+        <li>预训练模型做感知（MediaPipe / Whisper）</li>
+        <li>经典算法做度量（角度、距离、DTW）</li>
+        <li>LLM 做理解和表达（Claude）</li>
+        <li>教练视频是你最独特的数据壁垒</li>
+        <li>中文输出，接地气的教练口吻</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="note" style="margin-top:20px;">
+    <strong>🎯 核心壁垒：</strong>通用姿态分析谁都能做，但<strong>你的教练视频知识库</strong>让反馈有了专属教练的教学风格和独特经验——这才是这个 Agent 的真正价值。
+  </div>
+</div>
+
+<p style="text-align:center;color:var(--muted);margin-top:40px;font-size:0.85em;">
+  Tennis Analysis Agent — 全管线架构文档 &nbsp;|&nbsp; 下一步：开始搭建 Phase 1
+</p>
+
+</div>
+</body>
+</html>
